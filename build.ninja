@@ -1,0 +1,10 @@
+rule compile
+    command = clang++ $in -std=c++17 -o bin/$out
+    description = compiling $in
+
+rule run
+    command = ./bin/toy.exe examples/script1.tl
+    description = running toy interpreter
+
+build toy.exe: compile src/main.cpp
+build running: run toy.exe
