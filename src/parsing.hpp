@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <string_view>
+#include <algorithm>
 #include "lexing.hpp"
 
 enum ASTType {
@@ -14,8 +15,8 @@ enum ASTType {
     AST_UNARY_OP,
     AST_BINARY_OP,
     AST_ASSIGN,
-    AST_VAR_DECL,
-    AST_VAR_ASSIGN,
+    AST_ASSIGN_COPY,
+    AST_MODIFY_BY,
     AST_FUNC_DECL,
     AST_FUNC_CALL,
     AST_BLOCK,
@@ -36,34 +37,34 @@ enum ASTType {
 };
 
 constexpr const char * ASTTypeNames[] = {
-    "Invalid",
-    "Int",
-    "Float",
-    "Str",
-    "Id",
-    "Op",
-    "UnaryOp",
-    "BinaryOp",
-    "Assign",
-    "VarDecl",
-    "VarAssign",
-    "FuncDecl",
-    "FuncCall",
-    "Block",
-    "If",
-    "While",
-    "Return",
-    "Break",
-    "Continue",
-    "ExprStmt",
-    "StmtList",
-    "FuncParams",
-    "VarList",
-    "ArgList",
-    "ExprList",
-    "Program",
-    "DotAccess",
-    "BracketAccess",
+    "INVALID",
+    "INT",
+    "FLOAT",
+    "STR",
+    "ID",
+    "OP",
+    "UNARY_OP",
+    "BINARY_OP",
+    "ASSIGN",
+    "ASSIGN_COPY",
+    "MODIFY_BY",
+    "FUNC_DECL",
+    "FUNC_CALL",
+    "BLOCK",
+    "IF",
+    "WHILE",
+    "RETURN",
+    "BREAK",
+    "CONTINUE",
+    "EXPR_STMT",
+    "STMT_LIST",
+    "FUNC_PARAMS",
+    "VAR_LIST",
+    "ARG_LIST",
+    "EXPR_LIST",
+    "PROGRAM",
+    "DOT_ACCESS",
+    "BRACKET_ACCESS",
 };
 
 
@@ -71,6 +72,7 @@ struct ast_t {
     ASTType type;
     std::string_view value;
     std::vector<ast_t> children;
+    size_t line = 0;
 };
 
 
@@ -102,7 +104,9 @@ struct parser_t {
         ast_t program = {AST_PROGRAM, ""};
         size_t i = 0;
         while(i < tokens.size()) {
+            size_t line = line_nos[i];
             ast_t stmt = parse_stmt(tokens, line_nos, i);
+            stmt.line = line;
             print(stmt);
             program.children.push_back(stmt);
         }
@@ -220,7 +224,6 @@ struct parser_t {
     }
 
 
-
     ast_t parse_unary(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
         lex_token_t token = tokens[i];
         if(token.type == LEX_TOKEN_OP && (token.value == "~" || token.value == "-" || token.value == "!")) {
@@ -289,21 +292,25 @@ struct parser_t {
 
     ast_t parse_assignment(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
         ast_t lhs = parse_trinary(tokens, line_nos, i);
-        
-        if(i < tokens.size() && tokens[i].type == LEX_TOKEN_OP && tokens[i].value == "=") {
-            if(lhs.type == AST_BINARY_OP || lhs.type == AST_UNARY_OP) {
-                printf("Error::%zu:: Expected identifier, got %s\n", line_nos[i], ASTTypeNames[lhs.type]);
-                exit(1);
+        if (i < tokens.size() && tokens[i].type == LEX_TOKEN_OP) {
+            std::string_view & op = tokens[i].value;
+            if (op == "=" || op == ":=" || op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=") {
+                if (lhs.type == AST_BINARY_OP || lhs.type == AST_UNARY_OP) {
+                    printf("Error::%zu:: Expected identifier, got %s\n", line_nos[i], ASTTypeNames[lhs.type]);
+                    exit(1);
+                }
+                i++;
+                ast_t rhs = parse_assignment(tokens, line_nos, i);
+                return {op == "=" ? AST_ASSIGN : op == ":=" ? AST_ASSIGN_COPY : AST_MODIFY_BY, op, {lhs, rhs}};
             }
-            i++;
-            ast_t rhs = parse_assignment(tokens, line_nos, i);
-            return {AST_ASSIGN, "=", {lhs, rhs}};
         }
         return lhs;
     }
 
    ast_t parse_expr(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
-        return parse_assignment(tokens, line_nos, i);
+        auto expr = parse_assignment(tokens, line_nos, i);
+        expr.line = line_nos[i - 1];
+        return expr;
     }
 
     ast_t parse_arglist(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
@@ -417,6 +424,7 @@ struct parser_t {
         for(int i = 0; i < indent; i++) printf(" .");
         printf("%s: ", ASTTypeNames[ast.type]);
         printf("%.*s", (int)ast.value.size(), ast.value.data());
+        if(ast.line) printf(" (%zu)", ast.line);
         if(ast.children.size() > 0) {
             printf(" {\n");
             indent++;
