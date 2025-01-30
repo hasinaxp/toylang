@@ -54,6 +54,11 @@
         "cctype": "cpp",
         "clocale": "cpp",
         "fstream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "algorithm": "cpp",
+        "list": "cpp",
+        "optional": "cpp",
+        "unordered_map": "cpp",
+        "xhash": "cpp"
     }
 }

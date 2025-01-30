@@ -4,6 +4,7 @@
 #include <string_view>
 #include <algorithm>
 #include "lexing.hpp"
+#include "utils.hpp"
 
 enum ASTType {
     AST_INVALID = 0,
@@ -135,14 +136,13 @@ struct parser_t {
             i++;
             ast_t expr = parse_expr(tokens, line_nos, i);
             if(tokens[i].type != LEX_TOKEN_OP || tokens[i].value != ")") {
-                printf("Expected ')', got %.*s\n", (int)tokens[i].value.size(), tokens[i].value.data());
-                exit(1);
+                utils::unexpected_token(line_nos[i], tokens[i].value, ")");
             }
             i++;
             return expr;
         }
-        printf("Error::%zu:: Unexpected token %.*s\n", line_nos[i], (int)token.value.size(), token.value.data());
-        exit(1);
+        utils::unexpected_token(line_nos[i], tokens[i].value);
+        return {AST_INVALID, ""};
     }
 
     ast_t parse_binary_op(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i, ast_t (parser_t::*next_level)(std::vector<lex_token_t> &, std::vector<size_t> &, size_t &), const std::vector<std::string> & ops) {
@@ -161,8 +161,7 @@ struct parser_t {
         ast_t func = parse_term(tokens, line_nos, i);
         if(i < tokens.size() && tokens[i].type == LEX_TOKEN_OP && tokens[i].value == "(") {
             if (func.type != AST_ID) {
-                printf("Error::%zu:: Expected identifier, got %s\n", line_nos[i], ASTTypeNames[func.type]);
-                exit(1);
+                utils::unexpected_token(line_nos[i], tokens[i].value, "identifier");
             }
             i++;
             if(tokens[i].type == LEX_TOKEN_OP && tokens[i].value == ")") {
@@ -171,8 +170,7 @@ struct parser_t {
             }
             ast_t arglist = parse_arglist(tokens, line_nos, i);
             if(tokens[i].type != LEX_TOKEN_OP || tokens[i].value != ")") {
-                printf("Expected ')', got %.*s\n", (int)tokens[i].value.size(), tokens[i].value.data());
-                exit(1);
+                utils::unexpected_token(line_nos[i], tokens[i].value, ")");
             }
             i++;
             return {AST_FUNC_CALL, "", {func, arglist}};
@@ -186,8 +184,7 @@ struct parser_t {
             if(i < tokens.size() && tokens[i].type == LEX_TOKEN_OP && tokens[i].value == ".") {
                 i++;
                 if(i >= tokens.size() || tokens[i].type != LEX_TOKEN_ID) {
-                    printf("Error::%zu:: Expected identifier, got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-                    exit(1);
+                    utils::unexpected_token(line_nos[i], tokens[i].value, "identifier");
                 }
                 ast_t member = parse_func_call(tokens, line_nos, i);
                 term = {AST_DOT_ACCESS, "", {term, member}};
@@ -196,8 +193,7 @@ struct parser_t {
                 i++;
                 ast_t index = parse_expr(tokens, line_nos, i);
                 if(i >= tokens.size() || tokens[i].type != LEX_TOKEN_OP || tokens[i].value != "]") {
-                    printf("Error::%zu:: Expected ']', got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-                    exit(1);
+                    utils::unexpected_token(line_nos[i], tokens[i].value, "]");
                 }
                 term = {AST_BRACKET_ACCESS, "", {term, index}};
                 i++;
@@ -209,8 +205,7 @@ struct parser_t {
                     } else {
                         ast_t arglist = parse_arglist(tokens, line_nos, i);
                         if(tokens[i].type != LEX_TOKEN_OP || tokens[i].value != ")") {
-                            printf("Error::%zu:: Expected ')', got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-                            exit(1);
+                            utils::unexpected_token(line_nos[i], tokens[i].value, ")");
                         }
                         i++;
                         term = {AST_FUNC_CALL, "", {term, arglist}};
@@ -280,8 +275,7 @@ struct parser_t {
             i++;
             ast_t true_expr = parse_expr(tokens, line_nos, i);
             if(tokens[i].type != LEX_TOKEN_OP || tokens[i].value != ":") {
-                printf("Error::%zu:: Expected ':', got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-                exit(1);
+                utils::unexpected_token(line_nos[i], tokens[i].value, ":");
             }
             i++;
             ast_t false_expr = parse_expr(tokens, line_nos, i);
@@ -292,12 +286,12 @@ struct parser_t {
 
     ast_t parse_assignment(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
         ast_t lhs = parse_trinary(tokens, line_nos, i);
+        while(tokens[i].type == LEX_TOKEN_NEWLINE) i++;
         if (i < tokens.size() && tokens[i].type == LEX_TOKEN_OP) {
             std::string_view & op = tokens[i].value;
             if (op == "=" || op == ":=" || op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=") {
                 if (lhs.type == AST_BINARY_OP || lhs.type == AST_UNARY_OP) {
-                    printf("Error::%zu:: Expected identifier, got %s\n", line_nos[i], ASTTypeNames[lhs.type]);
-                    exit(1);
+                    utils::unexpected_token(line_nos[i], tokens[i].value, "identifier");
                 }
                 i++;
                 ast_t rhs = parse_assignment(tokens, line_nos, i);
@@ -326,8 +320,7 @@ struct parser_t {
 
     ast_t parse_block(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
         if(tokens[i].type != LEX_TOKEN_OP || tokens[i].value != "{") {
-            printf("Error::%zu:: Expected '{', got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-            exit(1);
+            utils::unexpected_token(line_nos[i], tokens[i].value, "{");
         }
         i++;
         ast_t block = {AST_BLOCK, ""};
@@ -336,8 +329,7 @@ struct parser_t {
             block.children.push_back(stmt);
         }
         if(i >= tokens.size() || tokens[i].type != LEX_TOKEN_OP || tokens[i].value != "}") {
-            printf("Error::%zu:: Expected '}', got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-            exit(1);
+            utils::unexpected_token(line_nos[i], tokens[i].value, "}");
         }
         i++;
         return block;
@@ -346,6 +338,10 @@ struct parser_t {
 
     ast_t parse_stmt(std::vector<lex_token_t> & tokens, std::vector<size_t> & line_nos, size_t & i) {
         while(tokens[i].type == LEX_TOKEN_NEWLINE) i++;
+        if(tokens[i].type == LEX_TOKEN_INT || tokens[i].type == LEX_TOKEN_FLOAT || tokens[i].type == LEX_TOKEN_STR) {
+            ast_t exp =  parse_expr(tokens, line_nos, i);
+            return {AST_EXPR_STMT, "", {exp}};
+        }
         if(tokens[i].type == LEX_TOKEN_ID) {
             if(tokens[i].value == "return") {
                 i++;
@@ -408,9 +404,7 @@ struct parser_t {
         if(tokens[i].type == LEX_TOKEN_OP && tokens[i].value == "{") {
             return parse_block(tokens, line_nos, i);
         }
-
-        printf("Error::%zu:: Expected statement, got %.*s\n", line_nos[i], (int)tokens[i].value.size(), tokens[i].value.data());
-        exit(1);
+        utils::unexpected_token(line_nos[i], tokens[i].value);
         return {AST_EXPR_STMT, ""};
       
     }
