@@ -22,10 +22,19 @@ enum BytecodeOp
 {
     BC_HALT = 0,
     BC_PUSH_INT,
+    BC_SET_INT,
     BC_COPY_INT,
     BC_ADD_INT_INT,
     BC_SUB_INT_INT,
-    BC_SET_INT,
+    BC_MUL_INT_INT,
+    BC_DIV_INT_INT,
+    BC_MOD_INT_INT,
+    BC_AND_INT_INT,
+    BC_OR_INT_INT,
+    BC_XOR_INT_INT,
+    BC_SHL_INT_INT,
+    BC_SHR_INT_INT,
+
 };
 
 struct variable_t
@@ -78,9 +87,22 @@ struct program_data_t
                 ss << "  sub rax, rbx" << std::endl;
                 ss << "  push rax" << std::endl;
                 i += 1;
+            }  else if (opcode == BC_MUL_INT_INT) {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  imul rax, rbx" << std::endl;
+                ss << "  push rax" << std::endl;
+                i += 1;
+            } else if (opcode == BC_DIV_INT_INT) {
+                ss << "  pop rbx" << std::endl;
+                ss << "  pop rax" << std::endl;
+                ss << "  cqo" << std::endl;
+                ss << "  idiv rbx" << std::endl;
+                ss << "  push rax" << std::endl;
+                i += 1;
             } else if (opcode == BC_SET_INT) {
                 ss << "  pop rax" << std::endl;
-                ss << "  mov [rsp - " << *(int64_t*)&bytecode[i + 1] << "], rax" << std::endl;
+                ss << "  mov [rsp + " << *(int64_t*)&bytecode[i + 1] << "], rax" << std::endl;
                 i += 9;
             } else if (opcode == BC_COPY_INT) {
                 ss << "  mov rax, [rsp + " << *(int64_t*)&bytecode[i + 1] << "]" << std::endl;
@@ -175,9 +197,19 @@ struct code_generator_t
     }
 
     void generate_code_stmt(const ast_t &ast, program_data_t &data,  var_context_t & ctx) {
-        check_ast_type(ast, AST_EXPR_STMT);
-        auto & expr = ast.children[0];
-        generate_code_expr(expr, data, ctx);
+        if(ast.type == AST_EXPR_STMT) {
+            auto & expr = ast.children[0];
+            generate_code_expr(expr, data, ctx);
+        } else if(ast.type == AST_BLOCK) {
+            ctx.push_scope();
+            for(auto & child : ast.children) {
+                generate_code_stmt(child, data, ctx);
+            }
+            ctx.pop_scope();
+        } else {
+            throw utils::error_t(ast.line, "Unexpected AST node type in statement: " + std::to_string(ast.type));
+        }
+        
     }
 
     ASTType generate_code_expr(const ast_t &ast, program_data_t &data, var_context_t & ctx) {
@@ -262,6 +294,32 @@ struct code_generator_t
                     throw utils::error_t(ast.line, msg);
                 }
                 break;
+            case '*':
+                if(t1 == AST_INT && t2 == AST_INT) {
+                    data.bytecode.push_back(BC_MUL_INT_INT);
+                    ctx.stack_size -= sizeof(int64_t);
+                    return AST_INT;
+                } else {
+                    std::string msg = "Invalid types for multiplication: ";
+                    msg += ASTTypeNames[t1];
+                    msg += " and ";
+                    msg += ASTTypeNames[t2];
+                    throw utils::error_t(ast.line, msg);
+                }
+                break;
+            case '/':
+                if(t1 == AST_INT && t2 == AST_INT) {
+                    data.bytecode.push_back(BC_DIV_INT_INT);
+                    ctx.stack_size -= sizeof(int64_t);
+                    return AST_INT;
+                } else {
+                    std::string msg = "Invalid types for division: ";
+                    msg += ASTTypeNames[t1];
+                    msg += " and ";
+                    msg += ASTTypeNames[t2];
+                    throw utils::error_t(ast.line, msg);
+                }
+                break;
             default:
                 throw utils::error_t(ast.line, std::string("Unknown binary operator: ") + std::string(ast.value));
         }
@@ -289,7 +347,7 @@ struct code_generator_t
                 throw utils::error_t(ast.line, "Type mismatch in assignment");
             }
             data.bytecode.push_back(BC_SET_INT);
-            data.push_int(var->offset);
+            data.push_int(var->offset, false);
         }
         std::cout << "generate_code_assign" << std::endl;
 
