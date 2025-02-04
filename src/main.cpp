@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
         std::cout << "> Generating code..." << std::endl;
         code_generator_t codegen;
         var_context_t ctx;
-        auto program = codegen.gen_program(ast, ctx);
+        auto program = codegen.gen_program(ast);
         std::cout << "> Generated code" << std::endl;
         std::cout << "program bytecode size: " << program.bytecode.size() << std::endl;
         std::cout << "bytecode: " << std::endl;
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
         // compile using gcc
         std::string cmd = "gcc -no-pie -o out asm_code.s";
         system(cmd.c_str());
-
+        std::cout << "> Compiled code" << std::endl;
     
     } catch (utils::error_t & e) {
         std::cerr << e.what() << std::endl;

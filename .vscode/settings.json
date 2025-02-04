@@ -1,7 +1,7 @@
 {
     "C_Cpp.default.intelliSenseMode": "windows-msvc-x64",
     "C_Cpp.intelliSenseEngine": "default",
-    "C_Cpp.default.compilerPath": "cl.exe",
+    "C_Cpp.default.compilerPath": "/usr/bin/g++",
     "files.associations": {
         "string_view": "cpp",
         "xstring": "cpp",
