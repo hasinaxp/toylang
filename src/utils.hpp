@@ -18,6 +18,16 @@ namespace utils
         return content;
     }
 
+    void write_string_to_file(const std::string &path, const std::string &content) {
+        std::ofstream file(path);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open file: " << path << std::endl;
+            return;
+        }
+        file << content;
+        file.close();
+    }
+
     class error_t : public std::runtime_error
     {
     public:

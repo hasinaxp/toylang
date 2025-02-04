@@ -108,7 +108,6 @@ struct parser_t {
             size_t line = line_nos[i];
             ast_t stmt = parse_stmt(tokens, line_nos, i);
             stmt.line = line;
-            print(stmt);
             program.children.push_back(stmt);
         }
         return program;

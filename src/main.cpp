@@ -26,8 +26,19 @@ int main(int argc, char **argv) {
         std::cout << "ast node size: " << sizeof(ast) << std::endl;
         parser.print(ast);
 
+        std::cout << "> Generating code..." << std::endl;
+        code_generator_t codegen;
+        var_context_t ctx;
+        auto program = codegen.gen_program(ast, ctx);
+        std::cout << "> Generated code" << std::endl;
+        std::cout << "program bytecode size: " << program.bytecode.size() << std::endl;
+        std::cout << "bytecode: " << std::endl;
+        std::string asm_code = program.asm_str(true);
+        utils::write_string_to_file("asm_code.s", asm_code);
+        // compile using gcc
+        std::string cmd = "gcc -no-pie -o out asm_code.s";
+        system(cmd.c_str());
 
-    
     
     } catch (utils::error_t & e) {
         std::cerr << e.what() << std::endl;
