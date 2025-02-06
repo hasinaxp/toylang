@@ -1,21 +1,15 @@
-x = 1
-if(x == 1) {
+x = 10
+y = 40
+if(x == 10) {
+    write(1)
+} else {
     write(2)
-    write(3)
-    write(4)
-    x = x + 10
-    write(x)
-}
-if(x == 1) {
-    write(2)
-    write(3)
-    write(4)
-    x = x + 10
-    write(x)
-}
-x = x - 2 * 2
-write(x)
-if(x != 2) {
-    write(0)
 }
 
+y = 20
+
+if(x == 10) {
+    write(3)
+} else {
+    write(4)
+}

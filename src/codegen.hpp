@@ -36,6 +36,7 @@ enum FunctionType
 enum BytecodeOp
 {
     BC_HALT = 0,
+    BC_SHRINK_STACK,
     BC_PUSH_INT,
     BC_SET_INT,
     BC_COPY_INT,
@@ -55,8 +56,10 @@ enum BytecodeOp
     BC_LT_INT_INT,
     BC_GE_INT_INT,
     BC_LE_INT_INT,
-    BC_TEST,
-    BC_TEST_FAIL_LABEL,
+    BC_IF,
+    BC_ELSE,
+    BC_TEST_FALSE_LABEL,
+    BC_TEST_END_END_LABEL,
     BC_SYSCALL,
 };
 
@@ -156,6 +159,15 @@ struct program_data_t
                 ss << " # push_int" << std::endl;
                 ss << "  movabs rax, " << *(int64_t *)&bytecode[i + 1] << std::endl;
                 ss << "  push rax" << std::endl
+                   << std::endl;
+                i += 9;
+            }
+            else if (opcode == BC_SHRINK_STACK)
+            {
+                std::cout << "shrink_stack" << std::endl;
+                size_t size = *(int64_t *)&bytecode[i + 1];
+                ss << " # shrink_stack" << std::endl;
+                ss << "  add rsp, " << size << std::endl
                    << std::endl;
                 i += 9;
             }
@@ -312,18 +324,33 @@ struct program_data_t
                 ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
-            else if (opcode == BC_TEST)
+            else if (opcode == BC_IF)
             {
                 size_t id = *(int64_t *)&bytecode[i + 1];
                 ss << "  pop rax" << std::endl;
                 ss << "  test rax, rax" << std::endl;
-                ss << "  jz .if_false" << id << std::endl;
+                ss << "  jz .if_end" << id << std::endl;
                 i += 9;
             }
-            else if (opcode == BC_TEST_FAIL_LABEL)
+            else if (opcode == BC_ELSE)
+            {
+                size_t id = *(int64_t *)&bytecode[i + 1];
+                ss << "  pop rax" << std::endl;
+                ss << "  test rax, rax" << std::endl;
+                ss << "  jmp .if_end" << id << std::endl;
+                ss << ".if_false" << id << ":" << std::endl;
+                i += 9;
+            }
+            else if (opcode == BC_TEST_FALSE_LABEL)
             {
                 size_t id = *(int64_t *)&bytecode[i + 1];
                 ss << ".if_false" << id << ":" << std::endl;
+                i += 9;
+            }
+            else if (opcode == BC_TEST_END_END_LABEL)
+            {
+                size_t id = *(int64_t *)&bytecode[i + 1];
+                ss << ".if_end" << id << ":" << std::endl;
                 i += 9;
             }
             else if (opcode == BC_HALT)
@@ -454,17 +481,14 @@ struct var_context_t
 
     void push_scope()
     {
-        scopes.push_back(vars.size());
+        scopes.push_back(stack_size);
     }
-    void pop_scope()
+    size_t pop_scope()
     {
-        size_t scope_start = scopes.back();
+        size_t offset = stack_size - scopes.back();
+        stack_size = scopes.back();
         scopes.pop_back();
-        while (vars.size() > scope_start)
-        {
-            stack_size -= vars.back().size;
-            vars.pop_back();
-        }
+        return offset;       
     }
 };
 
@@ -500,7 +524,12 @@ struct code_generator_t
             {
                 generate_code_stmt(child, data, ctx);
             }
-            ctx.pop_scope();
+            size_t offset = ctx.pop_scope();
+            if (offset > 0)
+            {
+                data.bytecode.push_back(BC_SHRINK_STACK);
+                data.push_int(offset, false);
+            }
         } else if (ast.type == AST_IF) {
             generate_code_if(ast, data, ctx);
         }
@@ -678,14 +707,51 @@ struct code_generator_t
         auto &cond = ast.children[0];
         auto &stmt = ast.children[1];
         generate_code_expr(cond, data, ctx);
-        data.bytecode.push_back(BC_TEST);
-        data.push_int(id, false);
-        ctx.stack_size -= sizeof(int64_t);
-        if(stmt.type == AST_BLOCK) {
+
+        if(ast.children.size() == 3) {
+            data.bytecode.push_back(BC_IF);
+            data.push_int(id, false);
+            ctx.stack_size -= sizeof(int64_t);
             generate_code_stmt(stmt, data, ctx);
-            data.bytecode.push_back(BC_TEST_FAIL_LABEL);
+            data.bytecode.push_back(BC_TEST_FALSE_LABEL);
+            auto &else_stmt = ast.children[2];
+            generate_code_stmt(else_stmt, data, ctx);
+            data.bytecode.push_back(BC_TEST_END_END_LABEL);
             data.push_int(id, false);
         }
+        else {
+            data.bytecode.push_back(BC_IF);
+            data.push_int(id, false);
+            ctx.stack_size -= sizeof(int64_t);
+            generate_code_stmt(stmt, data, ctx);
+            data.bytecode.push_back(BC_TEST_END_END_LABEL);
+            data.push_int(id, false);
+        }
+
+
+
+
+        // data.bytecode.push_back(BC_IF);
+        // data.push_int(id, false);
+        // ctx.stack_size -= sizeof(int64_t);
+        // if(stmt.type == AST_BLOCK) {
+        //     generate_code_stmt(stmt, data, ctx);
+        //     data.bytecode.push_back(BC_TEST_FALSE_LABEL);
+        //     data.push_int(id, false);
+        // }
+        // if(ast.children.size() == 3) {
+        //     bool is_else_if = ast.children[2].type == AST_IF;
+        //     if(is_else_if) {
+        //         data.bytecode.push_back(BC_ELSE);
+        //         data.push_int(id, false);
+        //         generate_code_if(ast.children[2], data, ctx);
+        //     } else {
+        //         auto &else_stmt = ast.children[2];
+        //         generate_code_stmt(else_stmt, data, ctx);
+        //         data.bytecode.push_back(BC_TEST_END_END_LABEL);
+        //         data.push_int(id, false);
+        //     }
+        // }
 
         return 0;
     }
