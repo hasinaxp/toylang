@@ -23,7 +23,7 @@ struct lex_token_t {
     lex_token_t(LexTokenType type, std::string_view value) : type(type), value(value) {}
 };
 
-const char * lex_operators = "+-*/%&|:?^~<>=,;(){}[].";
+const char * lex_operators = "+-*/%&|:?^~<>=,;(){}[].!";
 const char * lex_operators_single = "~,;(){}[]";
 
 

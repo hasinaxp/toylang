@@ -22,108 +22,18 @@ main:
   movabs rax, 1
   push rax
 
- # add_int_int
   pop rax
   pop rbx
-  add rax, rbx
+  cmp rax, rbx
+  sete al
+  movzx rax, al
   push rax
 
-  # set_int
-  mov rax, [rsp]
-  mov [rsp + 8], rax
-
-  # copy_int
-  mov rax, [rsp + 8]
-  push rax
-
+  pop rax
+  test rax, rax
+  jz .if_false0
  # push_int
-  movabs rax, 1
-  push rax
-
- # add_int_int
-  pop rax
-  pop rbx
-  add rax, rbx
-  push rax
-
-  # set_int
-  mov rax, [rsp]
-  mov [rsp + 16], rax
-
-  # copy_int
-  mov rax, [rsp + 16]
-  push rax
-
- # push_int
-  movabs rax, 1
-  push rax
-
- # add_int_int
-  pop rax
-  pop rbx
-  add rax, rbx
-  push rax
-
-  # set_int
-  mov rax, [rsp]
-  mov [rsp + 24], rax
-
-  # copy_int
-  mov rax, [rsp + 24]
-  push rax
-
- # push_int
-  movabs rax, 1
-  push rax
-
- # add_int_int
-  pop rax
-  pop rbx
-  add rax, rbx
-  push rax
-
-  # set_int
-  mov rax, [rsp]
-  mov [rsp + 32], rax
-
-  # copy_int
-  mov rax, [rsp + 32]
-  push rax
-
- # push_int
-  movabs rax, 1
-  push rax
-
- # add_int_int
-  pop rax
-  pop rbx
-  add rax, rbx
-  push rax
-
-  # set_int
-  mov rax, [rsp]
-  mov [rsp + 40], rax
-
-  # copy_int
-  mov rax, [rsp + 40]
-  push rax
-
- # push_int
-  movabs rax, 1
-  push rax
-
- # add_int_int
-  pop rax
-  pop rbx
-  add rax, rbx
-  push rax
-
-  # set_int
-  mov rax, [rsp]
-  mov [rsp + 48], rax
-
-  # copy_int
-  mov rax, [rsp + 48]
+  movabs rax, 2
   push rax
 
   mov rax, [rsp]
@@ -140,6 +50,269 @@ main:
   mov al, 0
   rep stosb
 
+ # push_int
+  movabs rax, 3
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+ # push_int
+  movabs rax, 4
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+  # copy_int
+  mov rax, [rsp + 24]
+  push rax
+
+ # push_int
+  movabs rax, 10
+  push rax
+
+ # add_int_int
+  pop rax
+  pop rbx
+  add rax, rbx
+  push rax
+
+  # set_int
+  mov rax, [rsp]
+  mov [rsp + 32], rax
+
+  # copy_int
+  mov rax, [rsp + 32]
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+.if_false0:
+  # copy_int
+  mov rax, [rsp + 40]
+  push rax
+
+ # push_int
+  movabs rax, 1
+  push rax
+
+  pop rax
+  pop rbx
+  cmp rax, rbx
+  sete al
+  movzx rax, al
+  push rax
+
+  pop rax
+  test rax, rax
+  jz .if_false1
+ # push_int
+  movabs rax, 2
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+ # push_int
+  movabs rax, 3
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+ # push_int
+  movabs rax, 4
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+  # copy_int
+  mov rax, [rsp + 64]
+  push rax
+
+ # push_int
+  movabs rax, 10
+  push rax
+
+ # add_int_int
+  pop rax
+  pop rbx
+  add rax, rbx
+  push rax
+
+  # set_int
+  mov rax, [rsp]
+  mov [rsp + 72], rax
+
+  # copy_int
+  mov rax, [rsp + 72]
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+.if_false1:
+  # copy_int
+  mov rax, [rsp + 80]
+  push rax
+
+ # push_int
+  movabs rax, 2
+  push rax
+
+ # push_int
+  movabs rax, 2
+  push rax
+
+  pop rax
+  pop rbx
+  imul rax, rbx
+  push rax
+
+  pop rbx
+  pop rax
+  sub rax, rbx
+  push rax
+
+  # set_int
+  mov rax, [rsp]
+  mov [rsp + 88], rax
+
+  # copy_int
+  mov rax, [rsp + 88]
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+  # copy_int
+  mov rax, [rsp + 96]
+  push rax
+
+ # push_int
+  movabs rax, 2
+  push rax
+
+  pop rax
+  pop rbx
+  cmp rax, rbx
+  setne al
+  movzx rax, al
+  push rax
+
+  pop rax
+  test rax, rax
+  jz .if_false2
+ # push_int
+  movabs rax, 0
+  push rax
+
+  mov rax, [rsp]
+  push rax
+  pop rdi
+  call int_to_str
+  mov rax, 1
+  mov rdi, 1
+  lea rsi, [numbuf]
+  mov rdx, 20
+  syscall
+  lea rdi, [numbuf]
+  mov rcx, 20
+  mov al, 0
+  rep stosb
+
+.if_false2:
 
   movabs rax, 60
   pop rdi

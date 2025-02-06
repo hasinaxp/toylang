@@ -49,7 +49,14 @@ enum BytecodeOp
     BC_XOR,
     BC_SHL,
     BC_SHR,
-
+    BC_EQ_INT_INT,
+    BC_NE_INT_INT,
+    BC_GT_INT_INT,
+    BC_LT_INT_INT,
+    BC_GE_INT_INT,
+    BC_LE_INT_INT,
+    BC_TEST,
+    BC_TEST_FAIL_LABEL,
     BC_SYSCALL,
 };
 
@@ -245,6 +252,80 @@ struct program_data_t
                 ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
+            else if (opcode == BC_EQ_INT_INT)
+            {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  cmp rax, rbx" << std::endl;
+                ss << "  sete al" << std::endl;
+                ss << "  movzx rax, al" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
+                i += 1;
+            }
+            else if (opcode == BC_NE_INT_INT)
+            {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  cmp rax, rbx" << std::endl;
+                ss << "  setne al" << std::endl;
+                ss << "  movzx rax, al" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
+                i += 1;
+            }
+            else if (opcode == BC_GT_INT_INT)
+            {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  cmp rax, rbx" << std::endl;
+                ss << "  setg al" << std::endl;
+                ss << "  movzx rax, al" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
+                i += 1;
+            }
+            else if (opcode == BC_LT_INT_INT)
+            {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  cmp rax, rbx" << std::endl;
+                ss << "  setl al" << std::endl;
+                ss << "  movzx rax, al" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
+                i += 1;
+            }
+            else if (opcode == BC_GE_INT_INT)
+            {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  cmp rax, rbx" << std::endl;
+                ss << "  setge al" << std::endl;
+                ss << "  movzx rax, al" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
+                i += 1;
+            }
+            else if (opcode == BC_LE_INT_INT)
+            {
+                ss << "  pop rax" << std::endl;
+                ss << "  pop rbx" << std::endl;
+                ss << "  cmp rax, rbx" << std::endl;
+                ss << "  setle al" << std::endl;
+                ss << "  movzx rax, al" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
+                i += 1;
+            }
+            else if (opcode == BC_TEST)
+            {
+                size_t id = *(int64_t *)&bytecode[i + 1];
+                ss << "  pop rax" << std::endl;
+                ss << "  test rax, rax" << std::endl;
+                ss << "  jz .if_false" << id << std::endl;
+                i += 9;
+            }
+            else if (opcode == BC_TEST_FAIL_LABEL)
+            {
+                size_t id = *(int64_t *)&bytecode[i + 1];
+                ss << ".if_false" << id << ":" << std::endl;
+                i += 9;
+            }
             else if (opcode == BC_HALT)
             {
                 ss << "  movabs rax, 60" << std::endl;
@@ -344,6 +425,7 @@ struct var_context_t
     std::vector<variable_t> vars;
     std::vector<size_t> scopes;
     std::unordered_map<std::string_view, size_t> var_map;
+    size_t codition_count = 0;
 
     void add_var(std::string_view name, size_t type, size_t size)
     {
@@ -353,6 +435,11 @@ struct var_context_t
         var.size = size;
         vars.push_back(var);
         var_map[name] = vars.size() - 1;
+    }
+
+    size_t create_condition_id()
+    {
+        return codition_count++;
     }
 
     variable_t *get_var(std::string_view name)
@@ -414,6 +501,8 @@ struct code_generator_t
                 generate_code_stmt(child, data, ctx);
             }
             ctx.pop_scope();
+        } else if (ast.type == AST_IF) {
+            generate_code_if(ast, data, ctx);
         }
         else
         {
@@ -520,6 +609,19 @@ struct code_generator_t
             }
         }
 
+        static const char *comparison_ops[] = {"==", "!=", ">", "<", ">=", "<="};
+        static BytecodeOp comparison_ops_code[] = {BC_EQ_INT_INT, BC_NE_INT_INT, BC_GT_INT_INT, BC_LT_INT_INT, BC_GE_INT_INT, BC_LE_INT_INT};
+
+        for (size_t i = 0; i < 6; i++)
+        {
+            if (ast.value == comparison_ops[i])
+            {
+                data.bytecode.push_back(comparison_ops_code[i]);
+                ctx.stack_size -= sizeof(int64_t);
+                return AST_INT;
+            }
+        }
+
         throw utils::error_t(ast.line, std::string("Unknown binary operator: ") + std::string(ast.value));
     }
 
@@ -567,5 +669,24 @@ struct code_generator_t
             return get_expression_type(exp.children[0], ctx);
         }
         throw utils::error_t(exp.line, "cannot determine expression type");
+    }
+
+    size_t generate_code_if(const ast_t &ast, program_data_t &data, var_context_t &ctx)
+    {
+        size_t id = ctx.create_condition_id();
+        check_ast_type(ast, AST_IF);
+        auto &cond = ast.children[0];
+        auto &stmt = ast.children[1];
+        generate_code_expr(cond, data, ctx);
+        data.bytecode.push_back(BC_TEST);
+        data.push_int(id, false);
+        ctx.stack_size -= sizeof(int64_t);
+        if(stmt.type == AST_BLOCK) {
+            generate_code_stmt(stmt, data, ctx);
+            data.bytecode.push_back(BC_TEST_FAIL_LABEL);
+            data.push_int(id, false);
+        }
+
+        return 0;
     }
 };

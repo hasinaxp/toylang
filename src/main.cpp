@@ -17,6 +17,21 @@ int main(int argc, char **argv) {
     }
 
     std::string src = utils::read_file_as_string(argv[1]);
+
+    lexer_t lexer;
+    std::cout << "> Lexing..." << std::endl;
+    try {
+        lexer.init(src.c_str(), src.size());
+        while (lexer.has_token())
+        {
+            auto token = lexer.next_token();
+            std::cout << "token: " << token.value
+                        << " line: " << lexer.line << std::endl;
+        }
+        std::cout << "> Lexed" << std::endl;
+    } catch (utils::error_t & e) {
+        std::cerr << e.what() << std::endl;
+    }
   
     parser_t parser;
     std::cout << "> Parsing..." << std::endl;
