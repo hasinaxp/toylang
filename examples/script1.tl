@@ -1,3 +1,8 @@
-x = 2 << 3
-x
-write(3)
+x = 1
+x = x + 1
+x = x + 1
+x = x + 1
+x = x + 1
+x = x + 1
+x = x + 1
+write(x)

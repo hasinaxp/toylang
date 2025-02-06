@@ -71,6 +71,47 @@ enum SystemCallType
     BC_SYS_WRITE_INT,
 };
 
+const char * int_to_str_asm_code = R"(
+
+int_to_str:
+    push rbx
+    push rdi
+    push rsi
+
+
+    mov rax, rdi                    # Get input integer from RDI
+    lea rdi, [numbuf + 20]          # Point to the end of numbuf
+    mov BYTE PTR [rdi], 0           # Null-terminate string
+    dec rdi                         # Move pointer back for storing digits
+
+    test rax, rax
+    jnz .convert_loop_int_to_str    
+    mov BYTE PTR [rdi], '0'         # Special case for zero
+    jmp .done_int_to_str
+
+.convert_loop_int_to_str:
+    xor rdx, rdx                    # Clear RDX for division
+    mov rbx, 10                     # Divisor
+    div rbx                         # RAX /= 10, remainder in RDX
+
+    add dl, '0'                     # Convert remainder to ASCII
+    mov BYTE PTR [rdi], dl          # Store ASCII digit
+    dec rdi                         # Move backward
+
+    test rax, rax
+    jnz .convert_loop_int_to_str
+
+.done_int_to_str:
+    inc rdi                         # Adjust pointer to start of the number
+    mov rax, rdi                    # Return pointer to the converted string
+
+    pop rsi
+    pop rdi
+    pop rbx
+    ret
+
+)";
+
 struct program_data_t
 {
     std::unordered_map<std::string_view, variable_t> vars;
@@ -92,6 +133,10 @@ struct program_data_t
     {
         std::stringstream ss;
         size_t syscalls = 0;
+        
+        bool include_int_to_str_code = false;
+
+
 
         int i = 0;
         while (i < bytecode.size())
@@ -99,6 +144,9 @@ struct program_data_t
             auto opcode = bytecode[i];
             if (opcode == BC_PUSH_INT)
             {
+
+                std::cout << "push_int" << std::endl;
+                ss << " # push_int" << std::endl;
                 ss << "  movabs rax, " << *(int64_t *)&bytecode[i + 1] << std::endl;
                 ss << "  push rax" << std::endl
                    << std::endl;
@@ -106,6 +154,8 @@ struct program_data_t
             }
             else if (opcode == BC_ADD_INT_INT)
             {
+                std::cout << "add_int_int" << std::endl;
+                ss << " # add_int_int" << std::endl;
                 ss << "  pop rax" << std::endl;
                 ss << "  pop rbx" << std::endl;
                 ss << "  add rax, rbx" << std::endl;
@@ -119,7 +169,7 @@ struct program_data_t
                 ss << "  pop rbx" << std::endl;
                 ss << "  pop rax" << std::endl;
                 ss << "  sub rax, rbx" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_MUL_INT_INT)
@@ -127,7 +177,7 @@ struct program_data_t
                 ss << "  pop rax" << std::endl;
                 ss << "  pop rbx" << std::endl;
                 ss << "  imul rax, rbx" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_DIV_INT_INT)
@@ -136,19 +186,23 @@ struct program_data_t
                 ss << "  pop rax" << std::endl;
                 ss << "  cqo" << std::endl;
                 ss << "  idiv rbx" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl<< std::endl;
                 i += 1;
             }
             else if (opcode == BC_SET_INT)
             {
-                ss << "  pop rax" << std::endl;
-                ss << "  mov [rsp + " << *(int64_t *)&bytecode[i + 1] << "], rax" << std::endl;
+                std::cout << "set_int" << std::endl;
+                ss << "  # set_int" << std::endl;
+                ss << "  mov rax, [rsp]" << std::endl;
+                ss << "  mov [rsp + " << *(int64_t *)&bytecode[i + 1] << "], rax" << std::endl << std::endl;
                 i += 9;
             }
             else if (opcode == BC_COPY_INT)
             {
+                std::cout << "copy_int" << std::endl;
+                ss << "  # copy_int" << std::endl;
                 ss << "  mov rax, [rsp + " << *(int64_t *)&bytecode[i + 1] << "]" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl  << std::endl;
                 i += 9;
             }
             else if (opcode == BC_AND)
@@ -156,7 +210,7 @@ struct program_data_t
                 ss << "  pop rax" << std::endl;
                 ss << "  pop rbx" << std::endl;
                 ss << "  and rax, rbx" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_OR)
@@ -164,7 +218,7 @@ struct program_data_t
                 ss << "  pop rax" << std::endl;
                 ss << "  pop rbx" << std::endl;
                 ss << "  or rax, rbx" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_XOR)
@@ -172,7 +226,7 @@ struct program_data_t
                 ss << "  pop rax" << std::endl;
                 ss << "  pop rbx" << std::endl;
                 ss << "  xor rax, rbx" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_SHL)
@@ -180,7 +234,7 @@ struct program_data_t
                 ss << "  pop rcx" << std::endl;
                 ss << "  pop rax" << std::endl;
                 ss << "  shl rax, cl" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_SHR)
@@ -188,19 +242,19 @@ struct program_data_t
                 ss << "  pop rcx" << std::endl;
                 ss << "  pop rax" << std::endl;
                 ss << "  shr rax, cl" << std::endl;
-                ss << "  push rax" << std::endl;
+                ss << "  push rax" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_HALT)
             {
                 ss << "  movabs rax, 60" << std::endl;
                 ss << "  xor rdi, rdi" << std::endl;
-                ss << "  syscall" << std::endl;
+                ss << "  syscall" << std::endl << std::endl;
                 i += 1;
             }
             else if (opcode == BC_SYSCALL)
             {
-                auto syscall = *(int64_t *)&bytecode[i + 1];
+                auto syscall = bytecode[i + 1];
                 if (syscall == BC_SYS_EXIT)
                 {
                     ss << "  movabs rax, 60" << std::endl;
@@ -209,10 +263,30 @@ struct program_data_t
                 }
                 else if (syscall == BC_SYS_WRITE_INT)
                 {
+                    include_int_to_str_code = true;
                     std::cout << "sys_call_write_int" << std::endl;
-                    sys_call_write_int(ss, syscalls);
+                    //push top of stack to stack
+                    ss << "  mov rax, [rsp]" << std::endl;
+                    ss << "  push rax" << std::endl;
+                    ss << "  pop rdi" << std::endl;
+                    ss << "  call int_to_str" << std::endl;
+                    // ss << "  sub rsp, 8" << std::endl;
+                    ss << "  mov rax, 1" << std::endl;
+                    ss << "  mov rdi, 1" << std::endl;
+                    ss << "  lea rsi, [numbuf]" << std::endl;
+                    ss << "  mov rdx, 20" << std::endl;
+                    ss << "  syscall" << std::endl;
+                    // ss << "  pop rax" << std::endl;
+                    //clear numbuf 20 bytes to 0
+                    ss << "  lea rdi, [numbuf]" << std::endl;
+                    ss << "  mov rcx, 20" << std::endl;
+                    ss << "  mov al, 0" << std::endl;
+                    ss << "  rep stosb" << std::endl << std::endl;
+
+
+
                 }
-                i += 9;
+                i += 2;
             }
             else
             {
@@ -227,7 +301,11 @@ struct program_data_t
             ss.clear();
             ss << ".intel_syntax noprefix" << std::endl;
             ss << ".section .bss" << std::endl;
-            ss << "numbuf: .skip 20" << std::endl;
+            ss << "numbuf:\n .skip 64" << std::endl;
+            ss << "tempbuf:\n .skip 2024"<< std::endl;
+            ss << ".section .data" << std::endl;
+            ss << "  msg: .asciz  \"Hello, World!\"" << std::endl;
+            ss << std::endl;
             ss << ".section .text" << std::endl;
             ss << "  .globl main" << std::endl;
             ss << "main:" << std::endl;
@@ -235,36 +313,16 @@ struct program_data_t
             ss << "  movabs rax, 60" << std::endl;
             ss << "  pop rdi" << std::endl;
             ss << "  syscall" << std::endl;
+            if (include_int_to_str_code)
+            {
+                ss << int_to_str_asm_code << std::endl;
+            }
             return ss.str();
         }
         return asm_code;
     }
 
-    void sys_call_write_int(std::stringstream & ss, size_t &i)
-    {
-        ss << "  pop rdi" << std::endl;
-        ss << "  mov rsi, offset numbuf + 19" << std::endl;
-        ss << "  mov byte ptr [rsi], 0xA" << std::endl;
-        ss << "  dec rsi" << std::endl;
-
-        ss << "itoa_loop" << i << ":" << std::endl;
-        ss << "  mov rax, rdi" << std::endl;
-        ss << "  mov rdx, 0" << std::endl;
-        ss << "  mov rcx, 10" << std::endl;
-        ss << "  div rdi" << std::endl;
-        ss << "  add dl, '0'" << std::endl;
-        ss << "  mov [rsi], dl" << std::endl;
-        ss << "  dec rsi" << std::endl;
-        ss << "  test rax, rax" << std::endl;
-        ss << "  jnz itoa_loop" << std::endl;
-
-        ss << "  inc rsi" << std::endl;
-
-        ss << "  mov rax, 1" << std::endl;
-        ss << "  mov rdi, 1" << std::endl;
-        ss << "  lea rdx, [rsi + numbuf]" << std::endl;
-        ss << "  syscall" << std::endl;
-    }
+    
 
 };
 
@@ -375,7 +433,6 @@ struct code_generator_t
         }
         case AST_ID:
         {
-            std::cout << "generate_code_id: " << ast.value << std::endl;
             auto var = ctx.get_var(ast.value);
             if (!var)
             {
@@ -383,7 +440,6 @@ struct code_generator_t
             }
             if (var->type == VAR_INT)
             {
-                std::cout << "var type: " << var->type << std::endl;
                 data.bytecode.push_back(BC_COPY_INT);
                 data.push_int(ctx.stack_size - var->offset, false);
                 ctx.stack_size += sizeof(int64_t);
@@ -408,9 +464,9 @@ struct code_generator_t
             auto name = ast.children[0].value;
             if (name == "write")
             {
-                data.bytecode.push_back(BC_SYSCALL);
-                data.push_int(BC_SYS_WRITE_INT, false);
                 generate_code_expr(ast.children[1].children[0], data, ctx);
+                data.bytecode.push_back(BC_SYSCALL);
+                data.bytecode.push_back(BC_SYS_WRITE_INT);
                 return AST_INT;
             }
         }
@@ -424,7 +480,6 @@ struct code_generator_t
 
     void generate_code_int(const ast_t &ast, program_data_t &data, size_t &stack_size)
     {
-        std::cout << "generate_code_int" << std::endl;
         data.bytecode.push_back(BC_PUSH_INT);
         int64_t value = std::stoll(std::string(ast.value));
         stack_size += sizeof(int64_t);
@@ -466,7 +521,6 @@ struct code_generator_t
         }
 
         throw utils::error_t(ast.line, std::string("Unknown binary operator: ") + std::string(ast.value));
-        std::cout << "generate_code_binary_op" << std::endl;
     }
 
     void generate_code_assign(const ast_t &ast, program_data_t &data, var_context_t &ctx)
@@ -479,14 +533,12 @@ struct code_generator_t
         }
         auto rhs = get_expression_type(ast.children[1], ctx);
         generate_code_expr(ast.children[1], data, ctx);
-        std::cout << "rhs type: " << ASTTypeNames[rhs] << std::endl;
         auto var = ctx.get_var(lhs.value);
         if (!var)
         {
             if (rhs == AST_INT)
             {
                 ctx.add_var(lhs.value, rhs, sizeof(int64_t));
-                std::cout << "stack size: " << ctx.stack_size << std::endl;
             }
         }
         else
@@ -496,9 +548,8 @@ struct code_generator_t
                 throw utils::error_t(ast.line, "Type mismatch in assignment");
             }
             data.bytecode.push_back(BC_SET_INT);
-            data.push_int(var->offset, false);
+            data.push_int(ctx.stack_size - var->offset, false);
         }
-        std::cout << "generate_code_assign" << std::endl;
     }
 
     size_t get_expression_type(const ast_t &exp, var_context_t &ctx)
